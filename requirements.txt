@@ -1,0 +1,9 @@
+boto3
+strands-agents
+strands-agents-tools[mem0_memory]
+bedrock-agentcore
+bedrock-agentcore-starter-toolkit
+streamlit
+pandas
+retrying
+tqdm

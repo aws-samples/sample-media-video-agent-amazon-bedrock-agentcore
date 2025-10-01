@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Media & Entertainment - Simple S3 Video Storage for AI Agent Workshop"
+
+Parameters:
+  BucketPrefix:
+    Type: String
+    Description: Prefix for the S3 bucket name
+    Default: media-workshop
+  VideoAssetsS3Path:
+    Type: String
+    Description: S3 path to video assets from workshop assets bucket
+    Default: ""
+
+Resources:
+  # S3 Bucket for Video Storage
+  VideoStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketPrefix}-videos-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - "*"
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: DeleteThumbnailsAfter30Days
+            Status: Enabled
+            Prefix: thumbnails/
+            ExpirationInDays: 30
+
+  # IAM Role for MediaConvert
+  MediaConvertRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-MediaConvertRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: mediaconvert.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Policies:
+        - PolicyName: MediaConvertAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - mediaconvert:*
+                Resource: "*"
+
+  # IAM Role for Video Copy Lambda
+  VideoCopyLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - "arn:aws:s3:::*"
+                  - "arn:aws:s3:::*/*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:DeleteObject
+                Resource: !Sub "arn:aws:s3:::${VideoStorageBucket}/*"
+
+  # Lambda function to copy videos from workshop assets
+  VideoCopyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-VideoCopy"
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt VideoCopyLambdaRole.Arn
+      Timeout: 900
+      MemorySize: 1024
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import urllib3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              try:
+                  logger.info(f"Event: {json.dumps(event)}")
+                  
+                  s3 = boto3.client('s3')
+                  bucket_name = event['ResourceProperties']['BucketName']
+                  assets_path = event['ResourceProperties'].get('VideoAssetsS3Path', '')
+                  
+                  if event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                      if not assets_path:
+                          logger.info("No video assets path provided, skipping video copy")
+                          cfnresponse.send(event, context, cfnresponse.SUCCESS, {"Message": "No assets to copy"})
+                          return
+                      
+                      # Parse S3 path
+                      if assets_path.startswith('s3://'):
+                          assets_path = assets_path[5:]
+                      
+                      parts = assets_path.split('/', 1)
+                      source_bucket = parts[0]
+                      source_prefix = parts[1] if len(parts) > 1 else ''
+                      
+                      logger.info(f"Copying from s3://{source_bucket}/{source_prefix} to s3://{bucket_name}/sample-videos/")
+                      
+                      # List objects in source bucket
+                      paginator = s3.get_paginator('list_objects_v2')
+                      pages = paginator.paginate(Bucket=source_bucket, Prefix=source_prefix)
+                      
+                      copied_count = 0
+                      for page in pages:
+                          if 'Contents' in page:
+                              for obj in page['Contents']:
+                                  key = obj['Key']
+                                  # Only copy video files
+                                  if key.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm')):
+                                      filename = key.split('/')[-1]  # Get just the filename
+                                      dest_key = f"sample-videos/{filename}"
+                                      
+                                      logger.info(f"Copying {key} to {dest_key}")
+                                      
+                                      # Copy object
+                                      copy_source = {'Bucket': source_bucket, 'Key': key}
+                                      s3.copy_object(
+                                          CopySource=copy_source,
+                                          Bucket=bucket_name,
+                                          Key=dest_key,
+                                          MetadataDirective='COPY'
+                                      )
+                                      copied_count += 1
+                      
+                      logger.info(f"Successfully copied {copied_count} video files")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {"CopiedFiles": copied_count})
+                  
+                  elif event['RequestType'] == 'Delete':
+                      # Clean up videos on stack deletion
+                      logger.info("Cleaning up videos on stack deletion")
+                      try:
+                          paginator = s3.get_paginator('list_objects_v2')
+                          pages = paginator.paginate(Bucket=bucket_name, Prefix='sample-videos/')
+                          
+                          for page in pages:
+                              if 'Contents' in page:
+                                  objects = [{'Key': obj['Key']} for obj in page['Contents']]
+                                  if objects:
+                                      s3.delete_objects(Bucket=bucket_name, Delete={'Objects': objects})
+                                      logger.info(f"Deleted {len(objects)} objects")
+                      except Exception as e:
+                          logger.warning(f"Error during cleanup: {str(e)}")
+                      
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {"Message": "Cleanup completed"})
+                  
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)})
+
+  # Custom Resource to trigger video copy
+  VideoCopyTrigger:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt VideoCopyFunction.Arn
+      BucketName: !Ref VideoStorageBucket
+      VideoAssetsS3Path: !Ref VideoAssetsS3Path
+    DependsOn: VideoStorageBucket
+
+Outputs:
+  VideoStorageBucketName:
+    Description: Name of the S3 bucket for video storage
+    Value: !Ref VideoStorageBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-VideoStorageBucket"

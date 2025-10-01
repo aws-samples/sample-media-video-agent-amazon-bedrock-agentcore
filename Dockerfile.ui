@@ -1,0 +1,46 @@
+# Use linux/amd64 platform for App Runner compatibility
+FROM --platform=linux/amd64 python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies including ffmpeg
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir streamlit boto3
+
+# Copy application code
+COPY video_agent_ui.py .
+
+# Create Streamlit config directory and config file
+RUN mkdir -p ~/.streamlit
+RUN echo '[server]\n\
+port = 8000\n\
+address = "0.0.0.0"\n\
+headless = true\n\
+enableCORS = false\n\
+enableXsrfProtection = false\n\
+enableWebsocketCompression = false\n\
+allowRunOnSave = false\n\
+runOnSave = false\n\
+\n\
+[browser]\n\
+gatherUsageStats = false\n\
+\n\
+[theme]\n\
+base = "light"\n\
+' > ~/.streamlit/config.toml
+
+# Expose port 8000 for App Runner
+EXPOSE 8000
+
+# Remove health check as it's causing issues
+# App Runner will use the default HTTP health check
+
+# Run Streamlit with optimized settings for App Runner
+CMD ["streamlit", "run", "video_agent_ui.py", "--server.port=8000", "--server.address=0.0.0.0", "--server.headless=true", "--server.enableCORS=false", "--server.enableXsrfProtection=false", "--server.enableWebsocketCompression=false", "--browser.gatherUsageStats=false"]
