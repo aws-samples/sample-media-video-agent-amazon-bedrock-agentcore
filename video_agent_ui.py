@@ -1,6 +1,7 @@
 import streamlit as st
 import boto3
 import json
+import os
 import time
 import re
 from datetime import datetime
@@ -352,8 +353,21 @@ def invoke_video_agent(agent_arn, prompt):
 # 3. Deploy S3 storage and get bucket name
 # 4. Update the values below:
 
-DEFAULT_AGENT_ARN = "arn:aws:bedrock-agentcore:us-west-2:966964893208:runtime/video_agent_final-R7bW1CGSYq"
-DEFAULT_BUCKET_NAME = "media-workshop-videos-966964893208-us-west-2"
+# Configuration automatically loaded from environment variables or .env file
+DEFAULT_AGENT_ARN = os.getenv('AGENT_ARN', '')
+DEFAULT_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', '')
+
+# If environment variables are not set, try to load from .env file
+if not DEFAULT_AGENT_ARN or not DEFAULT_BUCKET_NAME:
+    try:
+        with open('.env', 'r') as f:
+            for line in f:
+                if line.startswith('AGENT_ARN='):
+                    DEFAULT_AGENT_ARN = line.split('=', 1)[1].strip()
+                elif line.startswith('S3_BUCKET_NAME='):
+                    DEFAULT_BUCKET_NAME = line.split('=', 1)[1].strip()
+    except FileNotFoundError:
+        pass  # .env file doesn't exist, use empty defaults
 
 # ========================================
 
@@ -374,7 +388,7 @@ st.sidebar.title("🔧 Agent Configuration")
 agent_arn = st.sidebar.text_input(
     "Agent ARN",
     value=st.session_state.agent_arn,
-    help="Update DEFAULT_AGENT_ARN in the code with your deployed agent ARN",
+    help="Agent ARN is automatically configured from deployment",
     placeholder="arn:aws:bedrock-agentcore:us-west-2:..."
 )
 st.session_state.agent_arn = agent_arn
@@ -383,7 +397,7 @@ st.session_state.agent_arn = agent_arn
 bucket_name = st.sidebar.text_input(
     "S3 Bucket Name",
     value=st.session_state.bucket_name,
-    help="Update DEFAULT_BUCKET_NAME in the code with your S3 bucket name",
+    help="S3 bucket name is automatically configured from deployment",
     placeholder="your-video-bucket-name"
 )
 st.session_state.bucket_name = bucket_name

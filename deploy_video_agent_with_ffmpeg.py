@@ -54,7 +54,7 @@ def main():
     """Deploy video agent with ffmpeg support"""
     
     agentcore_runtime = Runtime()
-    agent_name = "video_agent_final_memory_sample_deploy"
+    agent_name = "video_agent_final_memory_sample_deploy_4"
 
     print("🔧 Configuring Video Agent for AgentCore Runtime...")
     response = agentcore_runtime.configure(
@@ -174,12 +174,16 @@ def main():
             print(f"   ⚠️ Could not add S3 permissions: {e}")
         
         print(f"\n🎯 Agent ARN: {launch_result.agent_arn}")
-        print("💡 Update your Streamlit UI with this ARN")
+        print("💡 This ARN will be automatically used in the UI deployment")
         print("🎬 ffmpeg is now available for thumbnail extraction!")
+        
+        # Return the agent ARN for use by calling scripts
+        return launch_result.agent_arn
         
     else:
         print(f"\n❌ Deployment failed with status: {status}")
         print("💡 Check CloudWatch logs for details")
+        return None
 
 if __name__ == "__main__":
     main()
