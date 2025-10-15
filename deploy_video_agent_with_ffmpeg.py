@@ -54,9 +54,15 @@ def main():
     """Deploy video agent with ffmpeg support"""
     
     agentcore_runtime = Runtime()
-    agent_name = "video_agent_final_memory_sample_deploy_4"
+    
+    # Prompt user for agent name
+    agent_name = input("Enter agent name (e.g., my-video-agent): ").strip()
+    if not agent_name:
+        agent_name = "media-video-agent"
+        print(f"Using default name: {agent_name}")
 
-    print("🔧 Configuring Video Agent for AgentCore Runtime...")
+    print(f"\n🔧 Configuring Video Agent for AgentCore Runtime...")
+    print(f"   Agent name: {agent_name}")
     response = agentcore_runtime.configure(
         entrypoint="video_agentcore.py",
         auto_create_execution_role=True,

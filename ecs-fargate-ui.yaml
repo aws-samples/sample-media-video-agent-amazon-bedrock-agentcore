@@ -100,17 +100,14 @@ Resources:
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Application Load Balancer
+      GroupDescription: Allow traffic from CloudFront only
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
+          SourcePrefixListId: pl-82a045eb
+          Description: Allow HTTP from CloudFront
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ALB-SG"
