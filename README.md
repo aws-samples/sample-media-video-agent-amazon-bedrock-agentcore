@@ -2,7 +2,13 @@
 
 An AI-powered video analysis solution that combines AWS Bedrock AgentCore, Amazon Rekognition, and Streamlit to create an intelligent video library assistant. Upload videos to S3, chat with your AI agent to analyze content, extract thumbnails, detect faces and celebrities, and get intelligent insights about your video collection.
 
-![Architecture](https://img.shields.io/badge/AWS-Bedrock%20AgentCore-orange) ![Architecture](https://img.shields.io/badge/AWS-App%20Runner-blue) ![Architecture](https://img.shields.io/badge/AI-Video%20Analysis-green)
+![Architecture](https://img.shields.io/badge/AWS-Bedrock%20AgentCore-orange) ![Architecture](https://img.shields.io/badge/AWS-ECS%20Fargate-blue) ![Architecture](https://img.shields.io/badge/AI-Video%20Analysis-green)
+
+## ⚠️ Important Disclaimer
+
+**This is a demonstration/sample project designed for learning and prototyping purposes only.**
+
+This code is NOT production-ready. Before deploying to production, you MUST address the security considerations listed in the Security section below.
 
 ## 🎯 Features
 
@@ -13,149 +19,49 @@ An AI-powered video analysis solution that combines AWS Bedrock AgentCore, Amazo
 - **🧠 Persistent Memory**: Conversation history using Bedrock AgentCore Memory
 - **☁️ Scalable Deployment**: Deploy on AWS App Runner with automatic scaling
 
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   App Runner    │    │  Bedrock Agent   │    │   S3 Bucket     │
-│  (Streamlit UI) │◄──►│     Core         │◄──►│   (Videos)      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │   Rekognition    │
-                       │ (Face Detection) │
-                       └──────────────────┘
-```
-
-## 🚀 Quick Start
-
-### 🎯 Deployment Options
-
-**Option 1: ECS Fargate (Recommended - Best for Streamlit)**
-
-- ✅ Full WebSocket support
-- ✅ Production-ready with load balancer
-- ✅ Auto-scaling and high availability
-- ✅ Better monitoring and logging
-
-**Option 2: App Runner (Simple but WebSocket limitations)**
-
-- ✅ Easiest deployment
-- ⚠️ WebSocket connection issues with Streamlit
-- ✅ Serverless scaling
-
-**Option 3: EC2 (Simple and reliable)**
-
-- ✅ Full control and compatibility
-- ✅ Easy troubleshooting
-- ⚠️ Manual scaling and management
+## 🚀 Quick Start - One-Click Deployment
 
 ### Prerequisites
 
 - AWS CLI configured with appropriate permissions
 - Python 3.9+ installed
-- Docker installed (for App Runner deployment)
-- AWS Account with access to:
-  - Bedrock AgentCore
-  - Amazon Rekognition
-  - Amazon S3
-  - AWS App Runner
+- Docker installed
 
-### Step 1: Deploy Infrastructure
-
-Deploy the S3 bucket and IAM roles:
+### Deploy Everything with One Command
 
 ```bash
-aws cloudformation deploy \
-  --template-file media-storage.yaml \
-  --stack-name media-video-agent-infrastructure \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-west-2 \
-  --parameter-overrides BucketPrefix=my-video-agent
+./deploy-complete.sh
 ```
 
-Get the bucket name from the stack outputs:
+This script will automatically:
 
-```bash
-aws cloudformation describe-stacks \
-  --stack-name media-video-agent-infrastructure \
-  --query 'Stacks[0].Outputs[?OutputKey==`VideoStorageBucketName`].OutputValue' \
-  --output text
-```
+1. ✅ Deploy S3 infrastructure
+2. ✅ Deploy Bedrock Video Agent with ffmpeg
+3. ✅ Build and push Docker image to ECR
+4. ✅ Deploy ECS Fargate with CloudFront and WAF
+5. ✅ Configure all security settings
+6. ✅ Wait for everything to be ready
 
-### Step 2: Deploy the Video Agent
+**Time**: ~15-20 minutes
 
-Install required Python packages:
+After deployment completes, you'll receive:
 
-```bash
-pip install bedrock-agentcore-starter-toolkit strands-agents boto3
-```
+- CloudFront HTTPS URL for accessing the application
+- S3 bucket name for uploading videos
+- Agent ARN and other configuration details
 
-Deploy the agent:
-
-```bash
-python deploy_video_agent_with_ffmpeg.py
-```
-
-**Save the Agent ARN** from the output - you'll need it for the UI deployment.
-
-### Step 3: Upload Sample Videos
-
-Upload your videos to the S3 bucket:
+### Upload Videos
 
 ```bash
 aws s3 cp your-video.mp4 s3://YOUR-BUCKET-NAME/sample-videos/
 ```
 
-### Step 4: Deploy the Web Interface
+### Clean Up
 
-#### Option A: AWS App Runner (Recommended)
-
-1. **Create ECR Repository:**
+To remove all deployed resources:
 
 ```bash
-aws ecr create-repository --repository-name video-agent-ui --region us-west-2
-```
-
-2. **Build and Push Docker Image:**
-
-```bash
-# Get your account ID
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-# Login to ECR
-aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com
-
-# Build and push
-docker build -t video-agent-ui .
-docker tag video-agent-ui:latest $ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/video-agent-ui:latest
-docker push $ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/video-agent-ui:latest
-```
-
-3. **Create App Runner Service:**
-   - Go to AWS Console > App Runner
-   - Create Service > Container registry > Amazon ECR
-   - Select your `video-agent-ui` repository
-   - Configure:
-     - Port: 8000
-     - Environment variables:
-       - `AGENT_ARN`: Your agent ARN from Step 2
-       - `S3_BUCKET_NAME`: Your bucket name from Step 1
-       - `AWS_REGION`: us-west-2
-
-#### Option B: Local Testing
-
-```bash
-# Install Streamlit
-pip install streamlit boto3
-
-# Set environment variables
-export AGENT_ARN="your-agent-arn"
-export S3_BUCKET_NAME="your-bucket-name"
-
-# Run locally
-streamlit run video_agent_ui.py
+./cleanup.sh
 ```
 
 ## 📁 Project Structure
@@ -206,30 +112,36 @@ The video agent includes these built-in tools:
 - `detect_faces_in_video()`: Face detection with Rekognition
 - `detect_celebrities_in_video()`: Celebrity recognition
 
-## 💰 Cost Estimation
+## � Sescurity Considerations
 
-### Monthly Costs (Approximate)
+**⚠️ This demo uses simplified security settings. Before production deployment, address these issues:**
 
-- **App Runner**: $5-25/month (scales to zero when idle)
-- **Bedrock AgentCore**: $10-50/month (usage-based)
-- **S3 Storage**: $1-10/month (depends on video library size)
-- **Rekognition**: Pay-per-use for face/celebrity detection
-- **Bedrock Pegasus**: Pay-per-use for video analysis
+### Known Security Issues
 
-### Cost Optimization Tips
+1. **Path Traversal Vulnerability**
 
-- App Runner automatically scales to zero when not in use
-- S3 lifecycle policies clean up old thumbnails after 30 days
-- Rekognition jobs are only triggered on demand
-- Use smaller video files for testing to minimize costs
+   - **Issue**: User-provided S3 keys in `video_agentcore.py` are used directly in file operations without validation
+   - **Risk**: Attackers could potentially access/overwrite files outside intended directories
+   - **Fix Required**: Implement input validation and sanitization for all S3 keys before file operations
 
-## 🔒 Security
+2. **Overly Permissive IAM Policies**
 
-- **S3 Bucket**: Blocks public access by default
-- **IAM Roles**: Use least-privilege permissions
-- **App Runner**: Provides HTTPS endpoints automatically
-- **No Hardcoded Credentials**: Uses AWS IAM roles and environment variables
-- **VPC**: Can be deployed in private subnets (optional)
+   - **Issue**: Uses `FullAccess` IAM policies (S3FullAccess, RekognitionFullAccess, etc.)
+   - **Risk**: Grants more permissions than necessary, violating least-privilege principle
+   - **Fix Required**: Replace all FullAccess policies with specific, least-privilege policies scoped to required resources
+
+3. **No Authentication**
+   - **Issue**: Streamlit UI has no login system or user authentication
+   - **Risk**: Anyone with the URL can access the application
+   - **Fix Required**: Implement authentication (e.g., AWS Cognito, OAuth, or API keys)
+
+### Current Security Features
+
+- ✅ S3 bucket blocks public access by default
+- ✅ CloudFront enforces HTTPS
+- ✅ ALB restricted to CloudFront IPs only
+- ✅ AWS WAF with OWASP Top 10 protection and rate limiting
+- ✅ No hardcoded credentials (uses IAM roles)
 
 ## 🛠️ Development
 
