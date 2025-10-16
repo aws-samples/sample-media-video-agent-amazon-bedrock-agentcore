@@ -111,7 +111,7 @@ The video agent includes these built-in tools:
 - `detect_faces_in_video()`: Face detection with Rekognition
 - `detect_celebrities_in_video()`: Celebrity recognition
 
-## � Sescurity Considerations
+## Security Considerations
 
 **⚠️ This demo uses simplified security settings. Before production deployment, address these issues:**
 
@@ -210,7 +210,7 @@ agent = Agent(
 1. **Agent deployment fails**
 
    - Check IAM permissions for Bedrock AgentCore
-   - Ensure you're in a supported region (us-west-2 recommended)
+   - Ensure you're in a supported region
    - Verify Python dependencies are installed
 
 2. **UI can't connect to agent**
@@ -238,30 +238,11 @@ agent = Agent(
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+See Contributing.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Issues**: Open an issue on GitHub
-- **Documentation**: Check the AWS Bedrock AgentCore documentation
-- **Community**: Join the AWS Developer Community
-
-## 🙏 Acknowledgments
-
-- AWS Bedrock team for AgentCore platform
-- TwelveLabs for the Pegasus video analysis model
-- Streamlit team for the amazing web framework
-- ffmpeg community for video processing tools
-
----
+## This project is licensed under the MIT-0 License
 
 **Built with ❤️ for the AWS community**
 
