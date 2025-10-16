@@ -70,17 +70,16 @@ To remove all deployed resources:
 media-video-agent/
 ├── README.md                           # This file
 ├── video_agentcore.py                  # Main agent logic with AI tools
-├── deploy_video_agent_with_ffmpeg.py   # Agent deployment script
 ├── video_agent_ui.py                   # Streamlit web interface
-├── media-storage.yaml                  # CloudFormation template for S3/IAM
-├── ecs-fargate-ui.yaml                 # CloudFormation template for ECS + CloudFront
-├── Dockerfile.ui                       # Container for Streamlit UI
+├── deploy_video_agent_with_ffmpeg.py   # Agent deployment script
+├── deploy-complete.sh                  # One-click deployment script
+├── cleanup.sh                          # Resource cleanup script
+├── media-storage.yaml                  # CloudFormation: S3 bucket and IAM roles
+├── ecs-fargate-ui.yaml                 # CloudFormation: ECS, CloudFront, ALB, WAF
+├── Dockerfile.ui                       # Docker container for Streamlit UI
 ├── requirements.txt                    # Python dependencies
-├── deploy.sh                          # Infrastructure deployment script
-├── deploy-ecs-fargate.sh              # ECS Fargate + CloudFront deployment
-├── cleanup.sh                         # Resource cleanup script
-├── LICENSE                            # MIT license
-└── .gitignore                         # Git ignore file
+├── LICENSE                             # MIT license
+└── .gitignore                          # Git ignore file
 ```
 
 ## 🎬 Usage Examples
