@@ -17,7 +17,7 @@ This code is NOT production-ready. Before deploying to production, you MUST addr
 - **👤 Face & Celebrity Detection**: Leverage Amazon Rekognition for face and celebrity recognition
 - **💬 Interactive Chat Interface**: Streamlit-based web UI for natural language interaction
 - **🧠 Persistent Memory**: Conversation history using Bedrock AgentCore Memory
-- **☁️ Scalable Deployment**: Deploy on AWS App Runner with automatic scaling
+- **☁️ Scalable Deployment**: Deploy on Amazon Elastic Container Service (ECS)
 
 ## 🚀 Quick Start - One-Click Deployment
 
