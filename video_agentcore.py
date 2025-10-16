@@ -24,7 +24,7 @@ def initialize_memory():
     
     try:
         print("🧠 Initializing video agent memory...")
-        MEMORY_CLIENT = MemoryClient(region_name="us-west-2")
+        MEMORY_CLIENT = MemoryClient(region_name="us-east-1")
         print(f"🧠 Created memory client: {MEMORY_CLIENT}")
         memory_name = "VideoAgentMemory"
         print(f"🧠 Looking for memory with name: {memory_name}")
@@ -258,7 +258,7 @@ def analyze_video_with_pegasus(bucket_name: str, video_key: str, prompt: str = "
         account_id = sts_client.get_caller_identity()['Account']
         
         # Create Bedrock client
-        bedrock_client = boto3.client('bedrock-runtime', region_name='us-west-2')
+        bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
         
         # Prepare the request payload
         request_payload = {
@@ -328,7 +328,7 @@ def extract_video_thumbnail(bucket_name: str, video_key: str, time_offset: int =
     try:
         print(f"📸 Starting ffmpeg thumbnail extraction: {bucket_name}/{video_key} at {time_offset}s")
         
-        s3_client = boto3.client('s3', region_name='us-west-2')
+        s3_client = boto3.client('s3', region_name='us-east-1')
         
         # Create temporary directories
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -476,7 +476,7 @@ def list_existing_thumbnails(bucket_name: str) -> dict:
     """
     try:
         print(f"📸 Listing existing thumbnails in: {bucket_name}")
-        s3_client = boto3.client('s3', region_name='us-west-2')
+        s3_client = boto3.client('s3', region_name='us-east-1')
         
         # List objects in thumbnails folder
         response = s3_client.list_objects_v2(
@@ -594,7 +594,7 @@ def detect_faces_in_video(bucket_name: str, video_key: str, wait_for_completion:
         print(f"👤 Starting face detection for: {bucket_name}/{video_key}")
         
         # Create Rekognition client
-        rekognition_client = boto3.client('rekognition', region_name='us-west-2')
+        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
         
         # Start face detection job
         response = rekognition_client.start_face_detection(
@@ -806,7 +806,7 @@ def detect_celebrities_in_video(bucket_name: str, video_key: str) -> dict:
     try:
         print(f"🌟 Starting celebrity detection for: {bucket_name}/{video_key}")
         
-        rekognition_client = boto3.client('rekognition', region_name='us-west-2')
+        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
         
         # Start celebrity recognition job
         response = rekognition_client.start_celebrity_recognition(
@@ -986,7 +986,7 @@ def check_celebrity_recognition_job(job_id: str = None) -> dict:
         
         print(f"🔍 Checking celebrity recognition job: {job_id}")
         
-        rekognition_client = boto3.client('rekognition', region_name='us-west-2')
+        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
         
         # Check job status
         job_response = rekognition_client.get_celebrity_recognition(JobId=job_id)
@@ -1045,7 +1045,7 @@ def check_celebrity_recognition_job(job_id: str = None) -> dict:
 # Create a BedrockModel
 bedrock_model = BedrockModel(
     model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-    region_name="us-west-2"
+    region_name="us-east-1"
 )
 
 video_agent = Agent(

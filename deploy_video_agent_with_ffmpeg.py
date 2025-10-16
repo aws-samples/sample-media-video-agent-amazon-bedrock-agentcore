@@ -68,7 +68,7 @@ def main():
         auto_create_execution_role=True,
         auto_create_ecr=True,
         requirements_file="requirements.txt",
-        region="us-west-2",
+        region="us-east-1",
         agent_name=agent_name
     )
     print("✅ Configuration completed")
@@ -101,10 +101,10 @@ def main():
         # Add full S3 permissions to the execution role
         print("\n🔐 Adding full S3 permissions to execution role...")
         try:
-            iam_client = boto3.client('iam', region_name='us-west-2')
+            iam_client = boto3.client('iam', region_name='us-east-1')
             
             # The role name follows a pattern - let's find it
-            role_name_pattern = f"AmazonBedrockAgentCoreSDKRuntime-us-west-2-"
+            role_name_pattern = f"AmazonBedrockAgentCoreSDKRuntime-us-east-1-"
             
             # List roles to find the one for our agent
             roles = iam_client.list_roles()

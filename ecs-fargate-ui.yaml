@@ -106,7 +106,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          SourcePrefixListId: pl-82a045eb
+          SourcePrefixListId: pl-3b927c52
           Description: Allow HTTP from CloudFront
       Tags:
         - Key: Name
@@ -169,6 +169,46 @@ Resources:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
+
+  # WAF Web ACL for CloudFront (us-east-1 allows CLOUDFRONT scope)
+  WAFWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub "${AWS::StackName}-waf"
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      Rules:
+        # AWS Managed Rule - Core Rule Set (OWASP Top 10)
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 1
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: CommonRuleSetMetric
+        # Rate Limiting Rule
+        - Name: RateLimitRule
+          Priority: 2
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 2000
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitMetric
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub "${AWS::StackName}-waf-metric"
 
   # CloudFront Distribution for HTTPS and caching
   CloudFrontDistribution:
@@ -237,6 +277,7 @@ Resources:
         PriceClass: PriceClass_100
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+        WebACLId: !GetAtt WAFWebACL.Arn
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-CloudFront"

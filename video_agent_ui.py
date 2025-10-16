@@ -58,7 +58,7 @@ def extract_s3_urls(text):
 def generate_presigned_url(s3_url, fallback_bucket_name, expiration=3600):
     """Generate a presigned URL for an S3 object"""
     try:
-        s3_client = boto3.client('s3', region_name='us-west-2')
+        s3_client = boto3.client('s3', region_name='us-east-1')
         
         # Extract bucket and key from S3 URL
         if s3_url.startswith('s3://'):
@@ -100,7 +100,7 @@ def generate_presigned_url(s3_url, fallback_bucket_name, expiration=3600):
 def list_actual_thumbnails(bucket_name):
     """List actual thumbnail files in the S3 bucket"""
     try:
-        s3_client = boto3.client('s3', region_name='us-west-2')
+        s3_client = boto3.client('s3', region_name='us-east-1')
         
         response = s3_client.list_objects_v2(
             Bucket=bucket_name,
@@ -123,7 +123,7 @@ def list_actual_thumbnails(bucket_name):
 def download_and_display_image(s3_url, fallback_bucket_name):
     """Download image data directly from S3 and display it"""
     try:
-        s3_client = boto3.client('s3', region_name='us-west-2')
+        s3_client = boto3.client('s3', region_name='us-east-1')
         
         # Extract bucket and key from S3 URL
         if s3_url.startswith('s3://'):
@@ -333,7 +333,7 @@ def parse_agent_response(boto3_response):
 def invoke_video_agent(agent_arn, prompt):
     """Invoke the video agent with a prompt"""
     try:
-        agentcore_client = boto3.client('bedrock-agentcore', region_name='us-west-2')
+        agentcore_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
         
         response = agentcore_client.invoke_agent_runtime(
             agentRuntimeArn=agent_arn,
@@ -389,7 +389,7 @@ agent_arn = st.sidebar.text_input(
     "Agent ARN",
     value=st.session_state.agent_arn,
     help="Agent ARN is automatically configured from deployment",
-    placeholder="arn:aws:bedrock-agentcore:us-west-2:..."
+    placeholder="arn:aws:bedrock-agentcore:us-east-1:..."
 )
 st.session_state.agent_arn = agent_arn
 

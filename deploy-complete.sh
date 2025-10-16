@@ -8,7 +8,7 @@ set -e
 # Configuration
 INFRA_STACK_NAME="media-video-agent-infrastructure"
 ECS_STACK_NAME="media-video-agent-ecs"
-REGION="us-west-2"
+REGION="us-east-1"
 BUCKET_PREFIX="media-video-agent"
 REPOSITORY_NAME="video-agent-ui"
 
