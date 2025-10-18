@@ -56,7 +56,7 @@ def main():
     agentcore_runtime = Runtime()
     
     # Prompt user for agent name
-    agent_name = input("Enter agent name (e.g., my-video-agent): ").strip()
+    agent_name = input("Enter agent name (e.g., myVideoAgent): ").strip()
     if not agent_name:
         agent_name = "media-video-agent"
         print(f"Using default name: {agent_name}")
@@ -156,22 +156,6 @@ def main():
                         }
                     ]
                 }
-                
-                # Create and attach the memory policy
-                policy_name = f"{execution_role_name}-MemoryPolicy"
-                try:
-                    iam_client.create_role_policy(
-                        RoleName=execution_role_name,
-                        PolicyName=policy_name,
-                        PolicyDocument=json.dumps(memory_policy)
-                    )
-                    print("   ✅ Bedrock AgentCore Memory permissions added")
-                except Exception as policy_error:
-                    if "already exists" in str(policy_error):
-                        print("   ✅ Memory policy already exists")
-                    else:
-                        print(f"   ⚠️ Could not add memory policy: {policy_error}")
-                
                 print("   ✅ S3, Rekognition, and Memory permissions configured")
             else:
                 print("   ⚠️ Could not find execution role")
