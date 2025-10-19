@@ -50,6 +50,8 @@ After deployment completes, you'll receive:
 - S3 bucket name for uploading videos
 - Agent ARN and other configuration details
 
+![Streamlit UI](static/images/StreamlitUI.png)
+
 ### Upload Videos
 
 ```bash
