@@ -147,8 +147,21 @@ ECR_IMAGE_URI="$ECR_URI/$REPOSITORY_NAME:latest"
 echo "✅ Docker image pushed: $ECR_IMAGE_URI"
 echo ""
 
-# Step 6: Deploy ECS Fargate stack
-echo "☁️  Step 6: Deploying ECS Fargate + CloudFront infrastructure..."
+# Step 6: Ensure ECS service-linked role exists
+echo "🔐 Step 6: Ensuring ECS service-linked role exists..."
+aws iam get-role --role-name AWSServiceRoleForECS > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "   Creating ECS service-linked role..."
+    aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com
+    echo "   Waiting for IAM role propagation (30 seconds)..."
+    sleep 30
+else
+    echo "   ✅ ECS service-linked role exists"
+fi
+echo ""
+
+# Step 7: Deploy ECS Fargate stack
+echo "☁️  Step 7: Deploying ECS Fargate + CloudFront infrastructure..."
 
 aws cloudformation deploy \
     --template-file ecs-fargate-ui.yaml \
@@ -181,8 +194,8 @@ SERVICE_URL=$(aws cloudformation describe-stacks \
 echo "✅ ECS Fargate deployment completed successfully"
 echo ""
 
-# Step 7: Wait for service to be stable
-echo "⏳ Waiting for ECS service to be stable..."
+# Step 8: Wait for service to be stable
+echo "⏳ Step 8: Waiting for ECS service to be stable..."
 echo "   This may take 5-10 minutes..."
 
 CLUSTER_NAME=$(aws cloudformation describe-stacks \
