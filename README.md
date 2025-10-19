@@ -101,17 +101,21 @@ Once deployed, you can interact with your video agent through natural language:
 
 - `AGENT_ARN`: Bedrock AgentCore agent ARN (required)
 - `S3_BUCKET_NAME`: S3 bucket for video storage (required)
-- `AWS_REGION`: AWS region (default: us-west-2)
+- `AWS_REGION`: AWS region (default: us-east-1)
 
 ### Agent Tools
 
 The video agent includes these built-in tools:
 
 - `list_s3_videos()`: List and browse videos in S3
-- `analyze_video_with_pegasus()`: AI-powered content analysis
-- `extract_video_thumbnail()`: Generate thumbnails using ffmpeg
-- `detect_faces_in_video()`: Face detection with Rekognition
-- `detect_celebrities_in_video()`: Celebrity recognition
+- `analyze_video_with_pegasus()`: AI-powered content analysis using TwelveLabs Pegasus
+- `extract_video_thumbnail()`: Generate thumbnails at specific timestamps using ffmpeg
+- `list_existing_thumbnails()`: List all previously generated thumbnails
+- `get_video_duration()`: Get technical metadata and duration for videos
+- `get_video_metadata()`: Get detailed metadata for specific videos
+- `detect_celebrities_in_video()`: Celebrity recognition with Amazon Rekognition
+- `get_recent_celebrity_job_status()`: Check status of recent celebrity detection jobs
+- `check_celebrity_recognition_job()`: Check status of specific celebrity recognition jobs
 
 ## Security Considerations
 
