@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "MediaVideoAgent",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "MediaVideoAgent"
+  },
+  "runtimes": [
+    {
+      "name": "VideoAgent",
+      "build": "Container",
+      "entrypoint": "main.py",
+      "codeLocation": "app/VideoAgent/",
+      "runtimeVersion": "PYTHON_3_12",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP",
+      "description": "Media video analysis agent (S3, Pegasus, Rekognition, ffmpeg)",
+      "envVars": [
+        {
+          "name": "MODEL_ID",
+          "value": "us.anthropic.claude-sonnet-4-6"
+        },
+        {
+          "name": "PEGASUS_MODEL_ID",
+          "value": "us.twelvelabs.pegasus-1-5-v1:0"
+        }
+      ],
+      "additionalPolicies": [
+        "video-agent-policy.json"
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "name": "VideoAgentMemory",
+      "eventExpiryDuration": 30,
+      "strategies": []
+    }
+  ],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "capacityProviders": [],
+  "payments": []
+}

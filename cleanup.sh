@@ -10,6 +10,7 @@ INFRA_STACK_NAME="media-video-agent-infrastructure"
 ECS_STACK_NAME="media-video-agent-ecs"
 REGION="us-east-1"
 REPOSITORY_NAME="video-agent-ui"
+AGENTCORE_STACK_NAME="AgentCore-MediaVideoAgent-default"
 
 echo "🗑️  AWS Media Video Agent - Cleanup"
 echo "===================================="
@@ -59,6 +60,16 @@ if aws cloudformation describe-stacks --stack-name $INFRA_STACK_NAME --region $R
     if [ ! -z "$BUCKET_NAME" ]; then
         echo "   Emptying bucket: $BUCKET_NAME"
         aws s3 rm s3://$BUCKET_NAME --recursive --region $REGION 2>/dev/null || true
+        # The bucket is versioned: remove old versions and delete markers too,
+        # otherwise CloudFormation cannot delete the non-empty bucket.
+        while true; do
+            VERSIONS=$(aws s3api list-object-versions --bucket "$BUCKET_NAME" --region $REGION --max-items 1000 \
+                --query '{Objects: [Versions, DeleteMarkers][][].{Key: Key, VersionId: VersionId}}' --output json)
+            if [ "$(echo "$VERSIONS" | grep -c '"Key"')" -eq 0 ]; then
+                break
+            fi
+            aws s3api delete-objects --bucket "$BUCKET_NAME" --region $REGION --delete "$VERSIONS" > /dev/null
+        done
         echo "✅ S3 bucket emptied"
     fi
 fi
@@ -86,28 +97,24 @@ else
 fi
 echo ""
 
-# Step 5: Delete Bedrock Agent
-echo "🗑️  Step 5: Deleting Bedrock Agent..."
-if [ -f ".bedrock_agentcore.yaml" ]; then
-    AGENT_ARN=$(grep "agent_arn:" .bedrock_agentcore.yaml | head -1 | awk '{print $2}')
-    if [ ! -z "$AGENT_ARN" ]; then
-        echo "   Deleting agent: $AGENT_ARN"
-        # Note: Bedrock AgentCore deletion is handled by the SDK
-        # The agent will be automatically cleaned up
-        echo "✅ Agent marked for deletion"
-    fi
+# Step 5: Delete the AgentCore stack (runtime, memory, ECR repo, CodeBuild project)
+echo "🗑️  Step 5: Deleting AgentCore Runtime stack..."
+if aws cloudformation describe-stacks --stack-name $AGENTCORE_STACK_NAME --region $REGION > /dev/null 2>&1; then
+    aws cloudformation delete-stack --stack-name $AGENTCORE_STACK_NAME --region $REGION
+    echo "   Waiting for AgentCore stack deletion..."
+    aws cloudformation wait stack-delete-complete --stack-name $AGENTCORE_STACK_NAME --region $REGION
+    echo "✅ AgentCore stack deleted"
 else
-    echo "⚠️  Agent configuration not found, skipping"
+    echo "⚠️  AgentCore stack not found, skipping"
 fi
 echo ""
 
-# Step 6: Clean up local files
-echo "🧹 Step 6: Cleaning up local configuration files..."
-rm -f .bedrock_agentcore.yaml
+# Step 6: Reset local deployment state
+echo "🧹 Step 6: Resetting local deployment state..."
+echo '{ "targets": {} }' > agentcore/.cli/deployed-state.json
+echo '[]' > agentcore/aws-targets.json
 rm -f .env
-rm -f Dockerfile
-rm -f .dockerignore
-echo "✅ Local files cleaned up"
+echo "✅ Local state reset"
 echo ""
 
 echo "🎉 Cleanup completed successfully!"
@@ -116,9 +123,9 @@ echo "📋 Summary:"
 echo "   ✅ ECS Fargate stack deleted (including CloudFront, ALB, WAF)"
 echo "   ✅ S3 bucket emptied and deleted"
 echo "   ✅ Infrastructure stack deleted"
-echo "   ✅ ECR repository deleted"
-echo "   ✅ Bedrock Agent marked for deletion"
-echo "   ✅ Local configuration files removed"
+echo "   ✅ UI ECR repository deleted"
+echo "   ✅ AgentCore Runtime, Memory and build resources deleted"
+echo "   ✅ Local deployment state reset"
 echo ""
 echo "💡 Note: Some resources may take a few minutes to fully delete."
 echo "   You can verify deletion in the AWS Console."

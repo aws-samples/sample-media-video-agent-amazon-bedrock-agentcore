@@ -1,0 +1,40 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListVideoBuckets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::media-video-agent-videos-*"
+    },
+    {
+      "Sid": "ReadVideosWriteThumbnails",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::media-video-agent-videos-*/*"
+    },
+    {
+      "Sid": "RekognitionVideoAnalysis",
+      "Effect": "Allow",
+      "Action": [
+        "rekognition:StartCelebrityRecognition",
+        "rekognition:GetCelebrityRecognition",
+        "rekognition:StartFaceDetection",
+        "rekognition:GetFaceDetection"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CallerIdentityForPegasusBucketOwner",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
+    }
+  ]
+}
