@@ -4,150 +4,21 @@ import time
 import subprocess
 import tempfile
 import os
+import re
 from strands import Agent, tool
 from strands.models import BedrockModel
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from bedrock_agentcore.memory import MemoryClient
+
+from memory.session import get_memory_session_manager
 
 app = BedrockAgentCoreApp()
 
-# Memory configurationn
-MEMORY_CLIENT = None
-MEMORY_ID = None
-ACTOR_ID = "video_agent_user"  # Default actor ID
-SESSION_ID = "video_session_001"  # Default session ID
-
-def initialize_memory():
-    """Initialize or retrieve existing memory for the video agent"""
-    global MEMORY_CLIENT, MEMORY_ID
-    
-    try:
-        print("🧠 Initializing video agent memory...")
-        MEMORY_CLIENT = MemoryClient(region_name="us-east-1")
-        print(f"🧠 Created memory client: {MEMORY_CLIENT}")
-        memory_name = "VideoAgentMemory"
-        print(f"🧠 Looking for memory with name: {memory_name}")
-        
-        # Try to find existing memory first
-        print(f"🧠 Listing existing memories...")
-        memories = MEMORY_CLIENT.list_memories()
-        print(f"🧠 Found {len(memories)} memories: {memories}")
-        
-        existing_memory = None
-        for memory in memories:
-            memory_id_in_list = memory.get('id', '')
-            print(f"🧠 Checking memory: id='{memory_id_in_list}', looking for='{memory_name}'")
-            if memory_id_in_list.startswith(memory_name):
-                existing_memory = memory
-                print(f"🧠 Found matching memory: {memory}")
-                break
-            else:
-                print(f"🧠 No match: '{memory_id_in_list}' does not start with '{memory_name}'")
-        
-        if existing_memory:
-            MEMORY_ID = existing_memory['id']
-            print(f"✅ Using existing memory: {MEMORY_ID}")
-        else:
-            # Create new memory resource for short-term memory
-            memory = MEMORY_CLIENT.create_memory(
-                name=memory_name,
-                description="Short-term memory for video agent conversations"
-            )
-            MEMORY_ID = memory['id']
-            print(f"✅ Created new memory: {MEMORY_ID}")
-            
-    except Exception as e:
-        print(f"⚠️ Memory initialization failed: {e}")
-        print("📝 Agent will continue without memory functionality")
-
-def load_conversation_history(actor_id: str = None, session_id: str = None):
-    """Load recent conversation history from memory"""
-    global MEMORY_CLIENT, MEMORY_ID
-    
-    print(f"🧠 load_conversation_history called with actor_id={actor_id}, session_id={session_id}")
-    print(f"🧠 MEMORY_CLIENT exists: {MEMORY_CLIENT is not None}")
-    print(f"🧠 MEMORY_ID: {MEMORY_ID}")
-    
-    if not MEMORY_CLIENT or not MEMORY_ID:
-        print("🧠 No memory client or ID available - returning empty history")
-        return ""
-    
-    try:
-        # Use provided IDs or defaults
-        actor = actor_id or ACTOR_ID
-        session = session_id or SESSION_ID
-        
-        print(f"🧠 Calling get_last_k_turns with memory_id={MEMORY_ID}, actor_id={actor}, session_id={session}")
-        
-        # Get last 5 conversation turns
-        recent_turns = MEMORY_CLIENT.get_last_k_turns(
-            memory_id=MEMORY_ID,
-            actor_id=actor,
-            session_id=session,
-            k=5
-        )
-        
-        print(f"🧠 get_last_k_turns returned: {recent_turns}")
-        
-        if not recent_turns:
-            print("🧠 No recent turns found")
-            return ""
-        
-        # Format conversation history
-        context_messages = []
-        for turn in recent_turns:
-            for message in turn:
-                role = message['role']
-                content = message['content']['text']
-                context_messages.append(f"{role}: {content}")
-        
-        context = "\n".join(context_messages)
-        print(f"🧠 Loaded {len(recent_turns)} conversation turns from memory")
-        print(f"🧠 Context preview: {context[:200]}...")
-        return f"\n\nRecent conversation history:\n{context}\n"
-        
-    except Exception as e:
-        print(f"⚠️ Failed to load conversation history: {e}")
-        import traceback
-        print(f"⚠️ Full traceback: {traceback.format_exc()}")
-        return ""
-
-def store_interaction(user_message: str, assistant_response: str, actor_id: str = None, session_id: str = None):
-    """Store user interaction in memory"""
-    global MEMORY_CLIENT, MEMORY_ID
-    
-    print(f"🧠 store_interaction called with actor_id={actor_id}, session_id={session_id}")
-    print(f"🧠 User message length: {len(user_message)}")
-    print(f"🧠 Assistant response length: {len(assistant_response)}")
-    
-    if not MEMORY_CLIENT or not MEMORY_ID:
-        print("🧠 No memory client or ID available - skipping storage")
-        return
-    
-    try:
-        # Use provided IDs or defaults
-        actor = actor_id or ACTOR_ID
-        session = session_id or SESSION_ID
-        
-        print(f"🧠 Calling create_event with memory_id={MEMORY_ID}, actor_id={actor}, session_id={session}")
-        
-        # Store the conversation turn
-        result = MEMORY_CLIENT.create_event(
-            memory_id=MEMORY_ID,
-            actor_id=actor,
-            session_id=session,
-            messages=[
-                (user_message, "USER"),
-                (assistant_response, "ASSISTANT")
-            ]
-        )
-        print(f"🧠 Stored interaction in memory successfully: {result}")
-        
-    except Exception as e:
-        print(f"⚠️ Failed to store interaction: {e}")
-        import traceback
-        print(f"⚠️ Full traceback: {traceback.format_exc()}")
+# Configuration comes from the runtime environment (set in agentcore/agentcore.json).
+REGION = os.getenv("AWS_REGION", "us-east-1")
+MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-6")
+PEGASUS_MODEL_ID = os.getenv("PEGASUS_MODEL_ID", "us.twelvelabs.pegasus-1-5-v1:0")
+DEFAULT_ACTOR_ID = "video_agent_user"
 
 # Define a video-focused system prompt
 VIDEO_AGENT_PROMPT = """You are a video library assistant that helps users manage and explore their video collection stored in Amazon S3.
@@ -258,7 +129,7 @@ def analyze_video_with_pegasus(bucket_name: str, video_key: str, prompt: str = "
         account_id = sts_client.get_caller_identity()['Account']
         
         # Create Bedrock client
-        bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
+        bedrock_client = boto3.client('bedrock-runtime', region_name=REGION)
         
         # Prepare the request payload
         request_payload = {
@@ -281,7 +152,7 @@ def analyze_video_with_pegasus(bucket_name: str, video_key: str, prompt: str = "
         for attempt in range(max_retries):
             try:
                 response = bedrock_client.invoke_model(
-                    modelId="us.twelvelabs.pegasus-1-2-v1:0",
+                    modelId=PEGASUS_MODEL_ID,
                     body=json.dumps(request_payload),
                     contentType="application/json"
                 )
@@ -328,20 +199,21 @@ def extract_video_thumbnail(bucket_name: str, video_key: str, time_offset: int =
     try:
         print(f"📸 Starting ffmpeg thumbnail extraction: {bucket_name}/{video_key} at {time_offset}s")
         
-        s3_client = boto3.client('s3', region_name='us-east-1')
+        s3_client = boto3.client('s3', region_name=REGION)
         
         # Create temporary directories
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Download video from S3
-            video_filename = os.path.basename(video_key)
-            local_video_path = os.path.join(temp_dir, video_filename)
-            
+            # Download video from S3. Local filenames are fixed, never derived from the
+            # S3 key, so a crafted key cannot escape the temporary directory.
+            _, ext = os.path.splitext(video_key)
+            local_video_path = os.path.join(temp_dir, f"input{ext.lower()[:8]}")
+
             print(f"📥 Downloading video from S3...")
             s3_client.download_file(bucket_name, video_key, local_video_path)
-            
-            # Create thumbnail filename
+
+            # S3 key for the thumbnail (flattened under thumbnails/)
             thumbnail_filename = video_key.replace('.mp4', f'_thumb_{time_offset}s.jpg').replace('/', '_')
-            local_thumbnail_path = os.path.join(temp_dir, thumbnail_filename)
+            local_thumbnail_path = os.path.join(temp_dir, "thumbnail.jpg")
             
             # Use ffmpeg to extract thumbnail
             print(f"🎬 Extracting thumbnail with ffmpeg...")
@@ -476,7 +348,7 @@ def list_existing_thumbnails(bucket_name: str) -> dict:
     """
     try:
         print(f"📸 Listing existing thumbnails in: {bucket_name}")
-        s3_client = boto3.client('s3', region_name='us-east-1')
+        s3_client = boto3.client('s3', region_name=REGION)
         
         # List objects in thumbnails folder
         response = s3_client.list_objects_v2(
@@ -552,23 +424,35 @@ def get_video_duration(bucket_name: str, video_key: str) -> dict:
     try:
         print(f"⏱️ Getting video duration for: {bucket_name}/{video_key}")
         
-        # Get basic S3 metadata first
-        s3_client = boto3.client('s3')
+        s3_client = boto3.client('s3', region_name=REGION)
         response = s3_client.head_object(Bucket=bucket_name, Key=video_key)
-        
-        # For now, estimate duration based on file size (rough approximation)
-        # In a full implementation, this would use AWS MediaInfo or similar service
         file_size_mb = response['ContentLength'] / (1024 * 1024)
-        estimated_duration_minutes = max(1, int(file_size_mb / 10))  # Rough estimate
-        
+
+        # ffprobe reads only the container headers over HTTP, so no full download is needed.
+        url = s3_client.generate_presigned_url(
+            'get_object', Params={'Bucket': bucket_name, 'Key': video_key}, ExpiresIn=300
+        )
+        probe = subprocess.run(
+            ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', url],
+            capture_output=True, text=True, timeout=60,
+        )
+        if probe.returncode != 0:
+            raise RuntimeError(f"ffprobe failed: {probe.stderr.strip()[:300]}")
+
+        info = json.loads(probe.stdout)
+        duration = float(info.get('format', {}).get('duration', 0))
+        video = next((s for s in info.get('streams', []) if s.get('codec_type') == 'video'), {})
+
         return {
             'video_path': f"{bucket_name}/{video_key}",
+            'duration_seconds': round(duration, 2),
+            'duration_formatted': time.strftime('%H:%M:%S', time.gmtime(duration)),
             'file_size_mb': round(file_size_mb, 2),
-            'estimated_duration_minutes': estimated_duration_minutes,
-            'estimated_duration_seconds': estimated_duration_minutes * 60,
+            'video_codec': video.get('codec_name'),
+            'resolution': f"{video.get('width')}x{video.get('height')}" if video else None,
+            'frame_rate': video.get('avg_frame_rate'),
             'content_type': response.get('ContentType', 'unknown'),
             'last_modified': response['LastModified'].isoformat(),
-            'note': "Duration is estimated - full implementation would use AWS MediaInfo",
             'success': True
         }
         
@@ -594,7 +478,7 @@ def detect_faces_in_video(bucket_name: str, video_key: str, wait_for_completion:
         print(f"👤 Starting face detection for: {bucket_name}/{video_key}")
         
         # Create Rekognition client
-        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
+        rekognition_client = boto3.client('rekognition', region_name=REGION)
         
         # Start face detection job
         response = rekognition_client.start_face_detection(
@@ -806,7 +690,7 @@ def detect_celebrities_in_video(bucket_name: str, video_key: str) -> dict:
     try:
         print(f"🌟 Starting celebrity detection for: {bucket_name}/{video_key}")
         
-        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
+        rekognition_client = boto3.client('rekognition', region_name=REGION)
         
         # Start celebrity recognition job
         response = rekognition_client.start_celebrity_recognition(
@@ -986,7 +870,7 @@ def check_celebrity_recognition_job(job_id: str = None) -> dict:
         
         print(f"🔍 Checking celebrity recognition job: {job_id}")
         
-        rekognition_client = boto3.client('rekognition', region_name='us-east-1')
+        rekognition_client = boto3.client('rekognition', region_name=REGION)
         
         # Check job status
         job_response = rekognition_client.get_celebrity_recognition(JobId=job_id)
@@ -1042,78 +926,55 @@ def check_celebrity_recognition_job(job_id: str = None) -> dict:
             'success': False
         }
 
-# Create a BedrockModel
-bedrock_model = BedrockModel(
-    model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-    region_name="us-east-1"
-)
+TOOLS = [
+    list_s3_videos,
+    get_video_metadata,
+    analyze_video_with_pegasus,
+    extract_video_thumbnail,
+    get_video_duration,
+    list_existing_thumbnails,
+    detect_celebrities_in_video,
+    check_celebrity_recognition_job,
+    get_recent_celebrity_job_status,
+    detect_faces_in_video,
+]
 
-video_agent = Agent(
-    model=bedrock_model,
-    system_prompt=VIDEO_AGENT_PROMPT,
-    tools=[
-        list_s3_videos, 
-        get_video_metadata, 
-        analyze_video_with_pegasus,
-        extract_video_thumbnail,
-        get_video_duration,
-        list_existing_thumbnails,
-        detect_celebrities_in_video,
-        check_celebrity_recognition_job,
-        get_recent_celebrity_job_status,
-        detect_faces_in_video
-    ],
-)
+
+def build_agent(session_id, actor_id, default_bucket=None):
+    """Create an agent bound to this conversation's AgentCore Memory session."""
+    system_prompt = VIDEO_AGENT_PROMPT
+    if default_bucket:
+        system_prompt += (
+            f"\n\nThe user's video bucket is '{default_bucket}'. Use it whenever the user "
+            "does not name a bucket explicitly."
+        )
+    return Agent(
+        model=BedrockModel(model_id=MODEL_ID, region_name=REGION),
+        system_prompt=system_prompt,
+        tools=TOOLS,
+        session_manager=get_memory_session_manager(session_id, actor_id),
+    )
+
 
 @app.entrypoint
-def video_agent_bedrock(payload):
-    """
-    Invoke the video agent with a payload, enhanced with memory
-    """
-    print(f"🚀 Starting video_agent_bedrock with payload: {payload}")
-    
-    # Initialize memory on first run
-    if MEMORY_CLIENT is None:
-        print("🧠 Initializing memory for the first time...")
-        initialize_memory()
-        print(f"🧠 Memory initialization complete. MEMORY_CLIENT: {MEMORY_CLIENT is not None}, MEMORY_ID: {MEMORY_ID}")
-    
-    # Extract user input and session info
+def video_agent_bedrock(payload, context):
+    """Invoke the video agent. Conversation history is persisted by AgentCore Memory,
+    keyed by the runtime session ID (or payload session_id) and actor_id."""
     user_input = payload.get("prompt")
-    actor_id = payload.get("actor_id", ACTOR_ID)
-    session_id = payload.get("session_id", SESSION_ID)
-    
-    print(f"🎬 User input: {user_input}")
-    print(f"🧠 Session: {actor_id}/{session_id}")
-    print(f"🧠 Memory status - Client: {MEMORY_CLIENT is not None}, ID: {MEMORY_ID}")
-    
-    # Load conversation history and enhance user input with context
-    print("🧠 Loading conversation history...")
-    conversation_history = load_conversation_history(actor_id, session_id)
-    print(f"🧠 Conversation history loaded: {len(conversation_history)} characters")
-    
-    # Create enhanced prompt with memory context
-    if conversation_history:
-        enhanced_prompt = f"{conversation_history}\n\nCurrent user message: {user_input}"
-        print("🧠 Enhanced prompt with conversation history")
-        print(f"🧠 Enhanced prompt preview: {enhanced_prompt[:200]}...")
-    else:
-        enhanced_prompt = user_input
-        print("📝 No previous conversation history found - using original prompt")
-    
-    # Get response from agent
-    print("🤖 Calling video agent...")
-    response = video_agent(enhanced_prompt)
-    assistant_response = response.message['content'][0]['text']
-    print(f"🤖 Agent response received: {len(assistant_response)} characters")
-    
-    # Store the interaction in memory
-    print("🧠 Storing interaction in memory...")
-    store_interaction(user_input, assistant_response, actor_id, session_id)
-    print("🧠 Memory storage complete")
-    
-    print(f"🤖 Assistant response: {assistant_response[:100]}...")
-    return assistant_response
+    if not user_input:
+        return "Please send a JSON payload with a 'prompt' field."
+
+    actor_id = payload.get("actor_id", DEFAULT_ACTOR_ID)
+    session_id = getattr(context, "session_id", None) or payload.get("session_id")
+
+    # Only accept a valid S3 bucket name, since it is placed into the system prompt
+    bucket = payload.get("bucket_name") or ""
+    default_bucket = bucket if re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket) else None
+
+    agent = build_agent(session_id, actor_id, default_bucket)
+    response = agent(user_input)
+    return str(response)
+
 
 if __name__ == "__main__":
     app.run()

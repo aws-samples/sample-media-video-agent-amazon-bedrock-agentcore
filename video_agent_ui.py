@@ -3,6 +3,7 @@ import boto3
 import json
 import os
 import time
+import uuid
 import re
 from datetime import datetime
 from urllib.parse import urlparse, quote
@@ -331,14 +332,20 @@ def parse_agent_response(boto3_response):
         return f"Error parsing response: {e}"
 
 def invoke_video_agent(agent_arn, prompt):
-    """Invoke the video agent with a prompt"""
+    """Invoke the video agent with a prompt.
+
+    The runtime session ID is stable for the browser session, so AgentCore routes
+    follow-up messages to the same session and AgentCore Memory keeps the history.
+    """
     try:
         agentcore_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
-        
+
         response = agentcore_client.invoke_agent_runtime(
             agentRuntimeArn=agent_arn,
             qualifier="DEFAULT",
-            payload=json.dumps({"prompt": prompt})
+            runtimeSessionId=st.session_state.runtime_session_id,
+            # The sidebar bucket becomes the agent's default, so free-text questions work
+            payload=json.dumps({"prompt": prompt, "bucket_name": st.session_state.bucket_name})
         )
         
         return parse_agent_response(response)
@@ -348,10 +355,8 @@ def invoke_video_agent(agent_arn, prompt):
 # ========================================
 # 🔧 CONFIGURATION - UPDATE THESE VALUES
 # ========================================
-# 1. Deploy your agent: python3 deploy_video_agent.py
-# 2. Copy the Agent ARN from the output
-# 3. Deploy S3 storage and get bucket name
-# 4. Update the values below:
+# deploy-complete.sh writes AGENT_ARN and S3_BUCKET_NAME to .env,
+# and the ECS stack passes them in as environment variables.
 
 # Configuration automatically loaded from environment variables or .env file
 DEFAULT_AGENT_ARN = os.getenv('AGENT_ARN', '')
@@ -372,6 +377,9 @@ if not DEFAULT_AGENT_ARN or not DEFAULT_BUCKET_NAME:
 # ========================================
 
 # Initialize session state
+if 'runtime_session_id' not in st.session_state:
+    # AgentCore requires a session ID of at least 33 characters; a UUID4 string is 36.
+    st.session_state.runtime_session_id = str(uuid.uuid4())
 if 'messages' not in st.session_state:
     st.session_state.messages = []
 if 'agent_arn' not in st.session_state:
@@ -438,6 +446,8 @@ if st.sidebar.button("📸 Generate Thumbnails"):
 # Clear chat button
 if st.sidebar.button("🗑️ Clear Chat"):
     st.session_state.messages = []
+    # Start a fresh AgentCore session so the agent's memory starts clean too
+    st.session_state.runtime_session_id = str(uuid.uuid4())
     st.rerun()
 
 # Connection status

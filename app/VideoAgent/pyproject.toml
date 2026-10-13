@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "VideoAgent"
+version = "0.2.0"
+description = "Media video analysis agent (Strands) for Amazon Bedrock AgentCore Runtime"
+requires-python = ">=3.10"
+dependencies = [
+    "aws-opentelemetry-distro ~= 0.18.0",
+    "bedrock-agentcore[strands-agents] >= 1.24.0, < 2.0.0",
+    "boto3 >= 1.40.0",
+    "botocore[crt] >= 1.40.0",
+    "strands-agents >= 1.60.0, < 2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

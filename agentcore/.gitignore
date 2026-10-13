@@ -1,0 +1,16 @@
+# Secrets (local environment files are never committed)
+.env.local
+
+# CDK Build Artifacts
+cdk/cdk.out/
+cdk/node_modules/
+
+# CLI Internals
+.cli/*
+
+# Ephemeral Staging
+.cache/*
+
+# Account-specific deployment state and targets. deploy-complete.sh writes
+# aws-targets.json for the current account; neither belongs in a public repo.
+aws-targets.json

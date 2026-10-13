@@ -305,20 +305,29 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AmazonRekognitionFullAccess
-        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
       Policies:
         - PolicyName: VideoAgentUIAccess
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Effect: Allow
+              - Sid: InvokeVideoAgent
+                Effect: Allow
                 Action:
-                  - bedrock-agentcore:*
-                  - bedrock:*
-                Resource: "*"
+                  - bedrock-agentcore:InvokeAgentRuntime
+                Resource:
+                  - !Ref AgentArn
+                  - !Sub "${AgentArn}/*"
+              - Sid: ListVideoBucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !Sub "arn:aws:s3:::${S3BucketName}"
+              - Sid: ReadVideosAndThumbnails
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${S3BucketName}/*"
 
   # IAM Role for ECS Task Execution
   ECSExecutionRole:

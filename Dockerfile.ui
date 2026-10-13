@@ -1,18 +1,14 @@
-# Use linux/amd64 platform for App Runner compatibility
-FROM --platform=linux/amd64 python:3.11-slim
+# UI image for ECS Fargate (linux/amd64)
+FROM --platform=linux/amd64 python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies including ffmpeg
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    gcc \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# The UI only calls AWS APIs; ffmpeg runs in the agent container, not here.
+RUN apt-get update && apt-get upgrade -y && apt-get clean
 
-# Copy requirements and install Python dependencies
+# Copy requirements and install pinned Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir streamlit boto3
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY video_agent_ui.py .
@@ -36,11 +32,8 @@ gatherUsageStats = false\n\
 base = "light"\n\
 ' > ~/.streamlit/config.toml
 
-# Expose port 8000 for App Runner
+# Streamlit listens on 8000 (ALB target port; ALB runs the HTTP health check)
 EXPOSE 8000
 
-# Remove health check as it's causing issues
-# App Runner will use the default HTTP health check
-
-# Run Streamlit with optimized settings for App Runner
+# Run Streamlit
 CMD ["streamlit", "run", "video_agent_ui.py", "--server.port=8000", "--server.address=0.0.0.0", "--server.headless=true", "--server.enableCORS=false", "--server.enableXsrfProtection=false", "--server.enableWebsocketCompression=false", "--browser.gatherUsageStats=false"]
